@@ -1,0 +1,7 @@
+*.class
+.* # Ignore all dotfiles...
+!.gitignore # except for .gitignore
+*.zip
+.metadata/
+ff/
+xcom roguelike aug1/
