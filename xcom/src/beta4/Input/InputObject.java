@@ -11,6 +11,12 @@ public abstract class InputObject {
 	private char currentKeyToPress;
 	private String description;
 	
+	//roots don't need default/current keys, but must have theseInputObjects[]
+	private boolean isRoot;
+	private boolean passesBackWriteBackObjectToParentCommand;
+	
+	public static final char keyNotNeeded = '?';
+	
 	
 	//these are optional
 	private  InputObject thisActiveDeeperObject;
@@ -20,19 +26,48 @@ public abstract class InputObject {
 	
 	
 	
-	public InputObject(char defaultKey, char currentKey, String newDiscription, InputObject[] theseChildInputObjects) throws ExceptionNoDescriptionForKeyCommand{
+	public InputObject(char defaultKey, char currentKey, String newDiscription, InputObject[] theseChildInputObjects, boolean isRoot, boolean passesBackObjectToParent) throws ExceptionNoDescriptionForKeyCommand, ExceptionRootObjectWithNoChildren, ExceptionThereAreKeyExceptions{
 		
 		this.defaultKeyToPress = defaultKey;
 		this.currentKeyToPress = currentKey;
 		this.description = newDiscription;
 		this.thisActiveDeeperObject = null;
 		this.theseInputObjects = theseChildInputObjects;
+		passesBackWriteBackObjectToParentCommand = passesBackObjectToParent;
+		
 		writeBackObject = null;
-		if(newDiscription == null || newDiscription == ""){
+		this.isRoot = isRoot;
+		
+		
+		if(thereAreKeyCollisions()) 
+			throw new ExceptionThereAreKeyExceptions();
+		if(newDiscription == null || newDiscription == "")
 			throw new ExceptionNoDescriptionForKeyCommand();
+		
+		if(isRoot && (theseInputObjects == null || this.theseInputObjects.length == 0))
+			throw new ExceptionRootObjectWithNoChildren();
+		
+		
+	}
+	private boolean thereAreKeyCollisions() {
+		
+		boolean duplicationsFound = false;
+		
+		if (this.theseInputObjects.length > 1){
+			
+			//TODO deal with getting a list of keys from a root of commands
+			for(int i = 0; i < theseInputObjects.length; i++){
+				
+				char temp = theseInputObjects[i].currentKeyToPress;	
+				for(int m = i+1; m < theseInputObjects.length; m++){
+					duplicationsFound = temp == theseInputObjects[m].currentKeyToPress;
+				}
+				if(duplicationsFound)
+					break;
+			}
+			
 		}
-		
-		
+		return duplicationsFound ;
 	}
 	public void resetKeyToDefault(boolean resetAllKeys){
 		if(resetAllKeys && (theseInputObjects != null)){
@@ -59,36 +94,48 @@ public abstract class InputObject {
 		}
 		return string.toString();
 	}
-	public InputObject receiveInput(char incoming) throws ExceptionProblemWithLeftOverActiveDeeperObject{
-		if(incoming == currentKeyToPress)
+	public InputObjectReturnObjectPair receiveInput(char incoming) throws ExceptionProblemWithLeftOverActiveDeeperObject{
+		
+		
+		if(!isRoot)
 		{
-			writeBackObject = algorithmsToAlwaysDoFirst(writeBackObject);
-			
-			if(thisActiveDeeperObject != null)
+			if(incoming == currentKeyToPress)
 			{
-				writeBackObject = algorithmsBeforeSendingToDeeperObject(writeBackObject);
-				thisActiveDeeperObject = thisActiveDeeperObject.receiveInput(incoming);
-				writeBackObject = algorithmsAfterSendingToDeeperObject(writeBackObject);
+				writeBackObject = algorithmsToAlwaysDoFirst(writeBackObject);
+				
+				if(thisActiveDeeperObject != null)
+				{
+					writeBackObject = algorithmsBeforeSendingToDeeperObject(writeBackObject);
+					thisActiveDeeperObject = thisActiveDeeperObject.receiveInput(incoming).getThisInputObject();
+					writeBackObject = algorithmsAfterSendingToDeeperObject(writeBackObject);
+					
+				}
+	
 			}
-
+			
+			//if returning a null value, meaning no longer in this method, should clear out the writeback;
+			boolean commandIsDone = (thisActiveDeeperObject == null);
+			
+			if(commandIsDone)
+			{
+				clearWriteBackWhenLeavingCommand();
+			}
+			
+			if(thisActiveDeeperObject != null && thisActiveDeeperObject == null)
+				throw new ExceptionProblemWithLeftOverActiveDeeperObject();
+		
 		}
+		return ;
 		
-		//if returning a null value, meaning no longer in this method, should clear out the writeback;
-		boolean commandIsDone = thisActiveDeeperObject == null;
-		
-		if(commandIsDone)
-			clearWriteBackWhenLeavingCommand();
-		
-		if(thisActiveDeeperObject != null && thisActiveDeeperObject == null)
-			throw new ExceptionProblemWithLeftOverActiveDeeperObject();
-		
-		return thisActiveDeeperObject;
 	}
 	
 	private void clearWriteBackWhenLeavingCommand() {
 		writeBackObject = null;
 		
 	}
+	
+	
+	
 	//feel free to make custom objects and cast them, knowing that they will only be accessed by these methods
 	protected abstract Object algorithmsToAlwaysDoFirst(Object writeBackObject2);
 	
